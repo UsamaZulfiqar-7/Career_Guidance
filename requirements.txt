@@ -1,0 +1,10 @@
+pyspark==4.2.0
+pandas
+numpy
+scikit-learn
+matplotlib
+seaborn
+streamlit
+joblib
+requests
+beautifulsoup4
