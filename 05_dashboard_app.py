@@ -1,12 +1,11 @@
 """
-STEP 5: Career Guidance Dashboard (Streamlit)
---------------------------------------------------
-This is the final tool students would actually use. It has:
-1. Market overview (top skills, salary trends)
-2. Trending skills (what's rising in demand)
-3. Personal skill-gap tool: pick a target role + your current skills ->
-   get a personalized "what to learn next" list
-4. Salary estimator
+STEP 5 (v2): Career Guidance Dashboard — Professional UI Edition
+------------------------------------------------------------------
+Redesigned with:
+- Custom color theme (Light + Dark mode toggle)
+- Interactive Plotly charts instead of static matplotlib
+- Custom-styled metric cards
+- Cleaner layout and typography
 
 Run with:  streamlit run 05_dashboard_app.py
 """
@@ -14,10 +13,194 @@ Run with:  streamlit run 05_dashboard_app.py
 import streamlit as st
 import pandas as pd
 import joblib
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+import plotly.express as px
 
-st.set_page_config(page_title="Career Guidance Tool", layout="wide")
+st.set_page_config(
+    page_title="Career Guidance Tool",
+    page_icon="🎯",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
+# ======================================================================
+# THEME SETUP (Light / Dark toggle stored in session_state)
+# ======================================================================
+if "theme" not in st.session_state:
+    st.session_state.theme = "dark"
+
+def toggle_theme():
+    st.session_state.theme = "light" if st.session_state.theme == "dark" else "dark"
+
+THEMES = {
+    "dark": {
+        "bg": "#0E1117",
+        "card_bg": "#1A1D27",
+        "card_border": "#2A2E3A",
+        "text": "#E8E9ED",
+        "subtext": "#9CA3AF",
+        "accent": "#7C5CFF",
+        "accent2": "#00D4B5",
+        "accent3": "#FF6B9D",
+        "plot_template": "plotly_dark",
+        "chart_bg": "rgba(0,0,0,0)",
+    },
+    "light": {
+        "bg": "#F7F8FC",
+        "card_bg": "#FFFFFF",
+        "card_border": "#E5E7EB",
+        "text": "#111827",
+        "subtext": "#6B7280",
+        "accent": "#6D28D9",
+        "accent2": "#0D9488",
+        "accent3": "#DB2777",
+        "plot_template": "plotly_white",
+        "chart_bg": "rgba(0,0,0,0)",
+    },
+}
+T = THEMES[st.session_state.theme]
+
+# ======================================================================
+# CUSTOM CSS
+# ======================================================================
+st.markdown(f"""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Space+Grotesk:wght@500;700&display=swap');
+
+    html, body, [class*="css"] {{
+        font-family: 'Inter', sans-serif;
+    }}
+
+    .stApp {{
+        background-color: {T['bg']};
+        color: {T['text']};
+    }}
+
+    section[data-testid="stSidebar"] {{
+        background-color: {T['card_bg']};
+        border-right: 1px solid {T['card_border']};
+    }}
+
+    /* Hero header */
+    .hero {{
+        padding: 1.8rem 2rem;
+        border-radius: 18px;
+        background: linear-gradient(120deg, {T['accent']}22, {T['accent2']}11);
+        border: 1px solid {T['card_border']};
+        margin-bottom: 1.5rem;
+    }}
+    .hero h1 {{
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 2.1rem;
+        font-weight: 700;
+        margin: 0;
+        background: linear-gradient(90deg, {T['accent']}, {T['accent3']});
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }}
+    .hero p {{
+        color: {T['subtext']};
+        font-size: 1rem;
+        margin-top: 0.4rem;
+    }}
+
+    /* Metric cards */
+    .metric-card {{
+        background: {T['card_bg']};
+        border: 1px solid {T['card_border']};
+        border-radius: 16px;
+        padding: 1.2rem 1.4rem;
+        text-align: left;
+        transition: transform 0.15s ease;
+    }}
+    .metric-card:hover {{ transform: translateY(-3px); }}
+    .metric-card .label {{
+        color: {T['subtext']};
+        font-size: 0.82rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }}
+    .metric-card .value {{
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 1.9rem;
+        font-weight: 700;
+        color: {T['text']};
+        margin-top: 0.2rem;
+    }}
+    .metric-card .accent-bar {{
+        height: 4px;
+        width: 40px;
+        border-radius: 4px;
+        margin-bottom: 0.6rem;
+    }}
+
+    /* Section titles */
+    .section-title {{
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: {T['text']};
+        margin: 1.2rem 0 0.6rem 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }}
+
+    /* Result pills */
+    .pill-box {{
+        background: {T['card_bg']};
+        border: 1px solid {T['card_border']};
+        border-radius: 14px;
+        padding: 1rem 1.2rem;
+    }}
+    .pill {{
+        display: inline-block;
+        padding: 0.35rem 0.8rem;
+        border-radius: 999px;
+        margin: 0.2rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }}
+    .pill-have {{ background: {T['accent2']}22; color: {T['accent2']}; border: 1px solid {T['accent2']}55; }}
+    .pill-missing {{ background: {T['accent3']}22; color: {T['accent3']}; border: 1px solid {T['accent3']}55; }}
+
+    div[data-testid="stTabs"] button {{ font-weight: 600; }}
+
+    .footer-note {{
+        text-align: center;
+        color: {T['subtext']};
+        font-size: 0.8rem;
+        padding: 1.5rem 0 0.5rem 0;
+    }}
+
+    /* Streamlit widget tweaks */
+    .stButton > button {{
+        background: linear-gradient(90deg, {T['accent']}, {T['accent3']});
+        color: white;
+        border: none;
+        border-radius: 10px;
+        padding: 0.55rem 1.4rem;
+        font-weight: 600;
+    }}
+    .stButton > button:hover {{ opacity: 0.9; }}
+</style>
+""", unsafe_allow_html=True)
+
+
+def metric_card(label, value, color):
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="accent-bar" style="background:{color};"></div>
+        <div class="label">{label}</div>
+        <div class="value">{value}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# ======================================================================
+# LOAD DATA & MODEL
+# ======================================================================
 @st.cache_data
 def load_data():
     jobs = pd.read_csv("job_postings.csv")
@@ -34,69 +217,116 @@ def load_model():
 jobs, skills = load_data()
 model, encoders, features = load_model()
 
-st.title("🎯 Career Guidance Tool")
-st.markdown("**Big Data Analytics Project** — Data-driven answer to: *'What skills should I actually learn?'*")
+# ======================================================================
+# SIDEBAR
+# ======================================================================
+with st.sidebar:
+    st.markdown("### ⚙️ Settings")
+    icon = "🌙" if st.session_state.theme == "dark" else "☀️"
+    st.button(f"{icon} Switch to {'Light' if st.session_state.theme == 'dark' else 'Dark'} Mode",
+              on_click=toggle_theme, use_container_width=True)
+    st.divider()
+    st.markdown("**About this tool**")
+    st.caption("A Big Data Analytics project that analyzes job market data "
+               "with PySpark and gives students personalized skill and "
+               "salary guidance using Machine Learning.")
+    st.divider()
+    st.caption(f"Dataset: {len(jobs):,} job postings")
+    st.caption(f"Skills tracked: {skills['skill'].nunique()}")
 
-tab1, tab2, tab3 = st.tabs(["📊 Market Overview", "🚀 Trending Skills", "🧭 My Skill Gap & Salary"])
+# ======================================================================
+# HERO HEADER
+# ======================================================================
+st.markdown("""
+<div class="hero">
+    <h1>🎯 Career Guidance Tool</h1>
+    <p>Big Data Analytics Project — data-driven answers to "what skills should I actually learn?"</p>
+</div>
+""", unsafe_allow_html=True)
+
+tab1, tab2, tab3 = st.tabs(["📊  Market Overview", "🚀  Trending Skills", "🧭  My Skill Gap & Salary"])
 
 # ================= TAB 1: Market Overview =================
 with tab1:
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Total Job Postings Analyzed", f"{len(jobs):,}")
-    col2.metric("Unique Skills Tracked", f"{skills['skill'].nunique()}")
-    col3.metric("Job Roles Covered", f"{jobs['title'].nunique()}")
+    c1, c2, c3, c4 = st.columns(4)
+    with c1: metric_card("Total Postings", f"{len(jobs):,}", T["accent"])
+    with c2: metric_card("Unique Skills", f"{skills['skill'].nunique()}", T["accent2"])
+    with c3: metric_card("Job Roles", f"{jobs['title'].nunique()}", T["accent3"])
+    with c4: metric_card("Cities Covered", f"{jobs['city'].nunique()}", T["accent"])
 
-    st.divider()
+    st.markdown("<br>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
 
     with c1:
-        st.subheader("Top 15 Most In-Demand Skills")
-        top_skills = skills["skill"].value_counts().head(15)
-        fig, ax = plt.subplots(figsize=(6, 6))
-        ax.barh(top_skills.index[::-1], top_skills.values[::-1], color="teal")
-        ax.set_xlabel("Number of Job Postings Requiring This Skill")
-        st.pyplot(fig)
+        st.markdown('<div class="section-title">🔥 Top 15 In-Demand Skills</div>', unsafe_allow_html=True)
+        top_skills = skills["skill"].value_counts().head(15).sort_values()
+        fig = go.Figure(go.Bar(
+            x=top_skills.values, y=top_skills.index, orientation="h",
+            marker=dict(color=top_skills.values, colorscale=[[0, T["accent"]], [1, T["accent2"]]]),
+        ))
+        fig.update_layout(template=T["plot_template"], plot_bgcolor=T["chart_bg"], paper_bgcolor=T["chart_bg"],
+                           height=460, margin=dict(l=10, r=10, t=10, b=10),
+                           xaxis_title="Job Postings", font=dict(color=T["text"]))
+        st.plotly_chart(fig, use_container_width=True)
 
     with c2:
-        st.subheader("Average Salary by Role (PKR/month)")
+        st.markdown('<div class="section-title">💰 Average Salary by Role</div>', unsafe_allow_html=True)
         avg_sal = jobs.copy()
         avg_sal["avg_salary"] = (avg_sal["salary_min_pkr"] + avg_sal["salary_max_pkr"]) / 2
-        top_paying = avg_sal.groupby("title")["avg_salary"].mean().sort_values(ascending=False).head(10)
-        fig, ax = plt.subplots(figsize=(6, 6))
-        ax.barh(top_paying.index[::-1], top_paying.values[::-1], color="darkorange")
-        ax.set_xlabel("Average Salary (PKR)")
-        st.pyplot(fig)
+        top_paying = avg_sal.groupby("title")["avg_salary"].mean().sort_values().tail(10)
+        fig = go.Figure(go.Bar(
+            x=top_paying.values, y=top_paying.index, orientation="h",
+            marker=dict(color=top_paying.values, colorscale=[[0, T["accent3"]], [1, T["accent"]]]),
+        ))
+        fig.update_layout(template=T["plot_template"], plot_bgcolor=T["chart_bg"], paper_bgcolor=T["chart_bg"],
+                           height=460, margin=dict(l=10, r=10, t=10, b=10),
+                           xaxis_title="Avg Salary (PKR/month)", font=dict(color=T["text"]))
+        st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown('<div class="section-title">🌆 Job Distribution by City</div>', unsafe_allow_html=True)
+    city_counts = jobs["city"].value_counts()
+    fig = px.pie(values=city_counts.values, names=city_counts.index, hole=0.55,
+                 color_discrete_sequence=[T["accent"], T["accent2"], T["accent3"], "#F5A623", "#4A90D9", "#9013FE", "#50E3C2"])
+    fig.update_layout(template=T["plot_template"], paper_bgcolor=T["chart_bg"],
+                       height=380, margin=dict(l=10, r=10, t=10, b=10), font=dict(color=T["text"]))
+    st.plotly_chart(fig, use_container_width=True)
 
 # ================= TAB 2: Trending Skills =================
 with tab2:
-    st.subheader("📈 Skills Growing Fastest in Demand")
-    st.caption("Comparing last 90 days of postings vs. the rest of the year (normalized by daily rate)")
+    st.markdown('<div class="section-title">📈 Fastest Growing Skills</div>', unsafe_allow_html=True)
+    st.caption("Comparing the last 90 days of postings vs. the rest of the year (normalized by daily rate)")
 
-    skills["date_posted"] = pd.to_datetime(jobs.set_index("job_id").loc[skills["job_id"]]["date_posted"].values)
-    max_date = skills["date_posted"].max()
+    skills_dt = skills.copy()
+    skills_dt["date_posted"] = pd.to_datetime(
+        jobs.set_index("job_id").loc[skills_dt["job_id"]]["date_posted"].values
+    )
+    max_date = skills_dt["date_posted"].max()
     cutoff = max_date - pd.Timedelta(days=90)
 
-    recent = skills[skills["date_posted"] >= cutoff]["skill"].value_counts() / 90
-    older = skills[skills["date_posted"] < cutoff]["skill"].value_counts() / (skills["date_posted"].nunique() - 90 if skills["date_posted"].nunique() > 90 else 275)
+    older_days = max(1, (skills_dt["date_posted"].max() - skills_dt["date_posted"].min()).days - 90)
+    recent = skills_dt[skills_dt["date_posted"] >= cutoff]["skill"].value_counts() / 90
+    older = skills_dt[skills_dt["date_posted"] < cutoff]["skill"].value_counts() / older_days
 
     trend_df = pd.DataFrame({"recent_rate": recent, "older_rate": older}).fillna(0)
     trend_df = trend_df[trend_df["recent_rate"] * 90 > 15]
-    trend_df["growth_pct"] = ((trend_df["recent_rate"] - trend_df["older_rate"]) / trend_df["older_rate"].replace(0, 0.001)) * 100
-    trend_df = trend_df.sort_values("growth_pct", ascending=False).head(10)
+    trend_df["growth_pct"] = ((trend_df["recent_rate"] - trend_df["older_rate"]) /
+                               trend_df["older_rate"].replace(0, 0.001)) * 100
+    trend_df = trend_df.sort_values("growth_pct").tail(10)
 
-    fig, ax = plt.subplots(figsize=(8, 5))
-    colors = ["crimson" if v > 0 else "steelblue" for v in trend_df["growth_pct"]]
-    ax.barh(trend_df.index[::-1], trend_df["growth_pct"][::-1], color=colors)
-    ax.set_xlabel("Growth % (recent vs. earlier in the year)")
-    ax.set_title("Fastest Growing Skills")
-    st.pyplot(fig)
+    colors = [T["accent3"] if v > 0 else T["accent"] for v in trend_df["growth_pct"]]
+    fig = go.Figure(go.Bar(x=trend_df["growth_pct"], y=trend_df.index, orientation="h",
+                            marker=dict(color=colors)))
+    fig.update_layout(template=T["plot_template"], plot_bgcolor=T["chart_bg"], paper_bgcolor=T["chart_bg"],
+                       height=460, margin=dict(l=10, r=10, t=10, b=10),
+                       xaxis_title="Growth % (recent vs. earlier this year)", font=dict(color=T["text"]))
+    st.plotly_chart(fig, use_container_width=True)
 
     st.info("💡 **Insight:** AI-related skills (ChatGPT/LLM Tools, Prompt Engineering, Generative AI) "
             "and Cloud Computing show the sharpest growth — these are worth prioritizing.")
 
 # ================= TAB 3: Skill Gap + Salary =================
 with tab3:
-    st.subheader("Find Out What YOU Should Learn Next")
+    st.markdown('<div class="section-title">🧭 Find Out What YOU Should Learn Next</div>', unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
     with col1:
@@ -104,13 +334,11 @@ with tab3:
         target_city = st.selectbox("📍 Target city:", sorted(jobs["city"].unique()))
         target_industry = st.selectbox("🏢 Target industry:", sorted(jobs["industry"].unique()))
         target_exp = st.selectbox("📈 Experience level:", sorted(jobs["experience_level"].unique()))
-
     with col2:
         all_skills = sorted(skills["skill"].unique())
         current_skills = st.multiselect("✅ Skills you ALREADY have:", all_skills)
 
-    if st.button("Analyze My Career Path", type="primary"):
-        # Skill gap analysis
+    if st.button("🔍 Analyze My Career Path", type="primary"):
         role_skills = skills[skills["title"] == target_role]["skill"].value_counts().head(10)
         current_set = set(s.lower() for s in current_skills)
 
@@ -118,11 +346,10 @@ with tab3:
         missing = [s for s in role_skills.index if s.lower() not in current_set]
         match_pct = len(have) / len(role_skills) * 100 if len(role_skills) > 0 else 0
 
-        st.divider()
+        st.markdown("<br>", unsafe_allow_html=True)
         m1, m2 = st.columns(2)
-        m1.metric("Market Match", f"{match_pct:.0f}%")
+        with m1: metric_card("Market Match", f"{match_pct:.0f}%", T["accent2"])
 
-        # Salary prediction
         try:
             row = pd.DataFrame([{
                 "title_enc": encoders["title"].transform([target_role])[0],
@@ -132,12 +359,25 @@ with tab3:
                 "skill_count": max(len(current_skills), 1),
             }])[features]
             predicted_salary = model.predict(row)[0]
-            m2.metric("Estimated Salary", f"PKR {predicted_salary:,.0f}/month")
+            with m2: metric_card("Estimated Salary", f"PKR {predicted_salary:,.0f}", T["accent"])
         except Exception:
-            m2.metric("Estimated Salary", "N/A")
+            with m2: metric_card("Estimated Salary", "N/A", T["accent"])
 
-        st.success(f"✅ Skills you already have that match this role: {', '.join(have) if have else 'None yet'}")
-        st.warning(f"📚 Top skills to learn next for **{target_role}**: {', '.join(missing) if missing else 'You have them all!'}")
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="pill-box">
+            <b>✅ Skills you already have that match this role:</b><br><br>
+            {''.join(f'<span class="pill pill-have">{s}</span>' for s in have) if have else '<i>None yet — start building your foundation!</i>'}
+        </div>
+        """, unsafe_allow_html=True)
 
-st.divider()
-st.caption("Big Data Analytics Course Project | Data processed with PySpark | Salary model: Random Forest Regressor")
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="pill-box">
+            <b>📚 Top skills to learn next for {target_role}:</b><br><br>
+            {''.join(f'<span class="pill pill-missing">{s}</span>' for s in missing) if missing else '<i>You already have them all! 🎉</i>'}
+        </div>
+        """, unsafe_allow_html=True)
+
+st.markdown('<div class="footer-note">Big Data Analytics Course Project · Data processed with PySpark · '
+            'Salary model: Random Forest Regressor</div>', unsafe_allow_html=True)

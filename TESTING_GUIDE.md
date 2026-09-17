@@ -34,7 +34,7 @@ Expected: pip version info. If missing, install Python properly (pip comes bundl
 cd career_guidance_project
 
 # 2. Create a virtual environment (keeps packages isolated - good practice)
-python3 -m venv career_env
+python -m venv career_env
 
 # 3. Activate it
 # On Mac/Linux:

@@ -5,6 +5,7 @@ scikit-learn
 matplotlib
 seaborn
 streamlit
+plotly
 joblib
 requests
 beautifulsoup4
