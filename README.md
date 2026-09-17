@@ -132,4 +132,3 @@ streamlit run 05_dashboard_app.py
 
 ---
 
-Good luck! Yeh project ek real problem solve karta hai, aur presentation mein "problem-first" approach dikhata hai jo aapke sir chahte hain.
