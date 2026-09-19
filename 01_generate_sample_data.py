@@ -1,7 +1,7 @@
 """
 STEP 1: Generate Sample Job Postings Dataset (for testing/development)
 --------------------------------------------------------------------------
-NOTE: For your ACTUAL project, real data ki 2 option shain:-
+NOTE: ACTUAL project, real data ki 2 option shain:-
 
 OPTION A - Real dataset from Kaggle (EASIEST, recommended):
    - "LinkedIn Job Postings 2023-2024" - https://www.kaggle.com/datasets/arshkon/linkedin-job-postings
