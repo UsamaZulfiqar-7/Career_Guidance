@@ -112,16 +112,25 @@ def generate_postings(n):
         if random.random() < (0.05 + (day_offset / 365) * 0.15):
             skills.append("Cloud Computing")
 
-        # salary depends on role seniority + number of skills (rough realistic simulation, in PKR)
+        # salary depends on role seniority + number of skills (realistic simulation, in PKR)
         base_salary = {
             "Entry Level (0-1 yrs)": 45000,
             "Mid Level (2-4 yrs)": 100000,
             "Senior Level (5+ yrs)": 220000,
         }[experience]
-        tech_roles = ["Data Scientist", "Machine Learning Engineer", "DevOps Engineer", "Software Engineer"]
+        tech_roles = [
+            "Data Scientist", "Machine Learning Engineer", "DevOps Engineer",
+            "Software Engineer", "Backend Developer", "Frontend Developer",
+            "Full Stack Developer", "Mobile App Developer", "Cybersecurity Analyst"
+        ]
         role_multiplier = 1.3 if role in tech_roles else 1.0
-        salary_min = int(base_salary * role_multiplier * random.uniform(0.85, 1.0))
-        salary_max = int(salary_min * random.uniform(1.2, 1.6))
+
+        # Each relevant skill adds market value (~3,000 PKR per skill)
+        skill_bonus = len(skills) * 3000
+        adjusted_base = (base_salary + skill_bonus) * role_multiplier
+
+        salary_min = int(adjusted_base * random.uniform(0.88, 1.0))
+        salary_max = int(salary_min * random.uniform(1.2, 1.5))
 
         date_posted = start_date + timedelta(days=day_offset)
 
@@ -140,13 +149,14 @@ def generate_postings(n):
 
     return pd.DataFrame(rows)
 
-df = generate_postings(8000)
-df.to_csv("job_postings.csv", index=False)
+if __name__ == "__main__":
+    df = generate_postings(8000)
+    df.to_csv("job_postings.csv", index=False)
 
-print(f"Sample dataset created: job_postings.csv")
-print(f"Total postings: {len(df)}")
-print(f"Unique roles: {df['title'].nunique()}")
-print(f"Unique cities: {df['city'].nunique()}")
-print(f"Date range: {df['date_posted'].min()} to {df['date_posted'].max()}")
-print("\nSample rows:")
-print(df.head())
+    print(f"Sample dataset created: job_postings.csv")
+    print(f"Total postings: {len(df)}")
+    print(f"Unique roles: {df['title'].nunique()}")
+    print(f"Unique cities: {df['city'].nunique()}")
+    print(f"Date range: {df['date_posted'].min()} to {df['date_posted'].max()}")
+    print("\nSample rows:")
+    print(df.head())

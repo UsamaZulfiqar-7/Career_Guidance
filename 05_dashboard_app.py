@@ -1,20 +1,25 @@
 """
-STEP 5 (v2): Career Guidance Dashboard — Professional UI Edition
-------------------------------------------------------------------
-Redesigned with:
-- Custom color theme (Light + Dark mode toggle)
-- Interactive Plotly charts instead of static matplotlib
-- Custom-styled metric cards
-- Cleaner layout and typography
+STEP 5: Career Guidance Dashboard — Modern UI Edition
+------------------------------------------------------
+Interactive Streamlit analytics dashboard featuring:
+- Theme Support (Light / Dark mode toggle)
+- Dynamic Market Overview with interactive Plotly visual representations
+- Precomputed Trending Skills tracking with fast fallback
+- Real-time Competency Gap Analyzer & Predictive Salary Forecasting
+- Resilient Data Readiness Health Checks
 
-Run with:  streamlit run 05_dashboard_app.py
+Run with: streamlit run 05_dashboard_app.py
 """
 
+import os
+import html
 import streamlit as st
 import pandas as pd
-import joblib
 import plotly.graph_objects as go
 import plotly.express as px
+
+from core.recommender import analyze_skill_gap, predict_salary, load_model_bundle
+from core.analytics import calculate_trending_skills_df, calculate_role_salaries_df
 
 st.set_page_config(
     page_title="Career Guidance Tool",
@@ -199,23 +204,57 @@ def metric_card(label, value, color):
 
 
 # ======================================================================
+# DATA READINESS CHECK
+# ======================================================================
+required_files = ["job_postings.csv", "job_skills_exploded.csv", "salary_model.pkl"]
+missing_files = [f for f in required_files if not os.path.exists(f)]
+
+if missing_files:
+    st.markdown("""
+    <div class="hero">
+        <h1>🎯 Career Guidance Tool</h1>
+        <p>Big Data Analytics Project — data-driven answers to "what skills should I actually learn?"</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.warning("⚠️ **Pipeline Data Not Yet Initialized**")
+    st.info(
+        "The following required pipeline artifact(s) were not found: "
+        f"`{', '.join(missing_files)}`.\n\n"
+        "Please run the pipeline steps in order before launching the dashboard:\n\n"
+        "```bash\n"
+        "python 01_generate_sample_data.py\n"
+        "python 03_spark_skills_analysis.py\n"
+        "python 04_recommendation_engine.py\n"
+        "```"
+    )
+    st.stop()
+
+
+# ======================================================================
 # LOAD DATA & MODEL
 # ======================================================================
 @st.cache_data
 def load_data():
     jobs = pd.read_csv("job_postings.csv")
     skills = pd.read_csv("job_skills_exploded.csv")
-    return jobs, skills
+
+    trending = None
+    if os.path.exists("trending_skills.csv"):
+        trending = pd.read_csv("trending_skills.csv")
+
+    role_salaries = None
+    if os.path.exists("role_salaries.csv"):
+        role_salaries = pd.read_csv("role_salaries.csv")
+
+    return jobs, skills, trending, role_salaries
 
 @st.cache_resource
 def load_model():
-    model = joblib.load("salary_model.pkl")
-    encoders = joblib.load("salary_encoders.pkl")
-    features = joblib.load("salary_features.pkl")
-    return model, encoders, features
+    return load_model_bundle(".")
 
-jobs, skills = load_data()
-model, encoders, features = load_model()
+jobs, skills, trending_precomputed, role_salaries_precomputed = load_data()
+model, encoders, features, metadata = load_model()
 
 # ======================================================================
 # SIDEBAR
@@ -228,7 +267,7 @@ with st.sidebar:
     st.divider()
     st.markdown("**About this tool**")
     st.caption("A Big Data Analytics project that analyzes job market data "
-               "with PySpark and gives students personalized skill and "
+               "with PySpark and provides personalized skill and "
                "salary guidance using Machine Learning.")
     st.divider()
     st.caption(f"Dataset: {len(jobs):,} job postings")
@@ -265,22 +304,24 @@ with tab1:
             marker=dict(color=top_skills.values, colorscale=[[0, T["accent"]], [1, T["accent2"]]]),
         ))
         fig.update_layout(template=T["plot_template"], plot_bgcolor=T["chart_bg"], paper_bgcolor=T["chart_bg"],
-                           height=460, margin=dict(l=10, r=10, t=10, b=10),
-                           xaxis_title="Job Postings", font=dict(color=T["text"]))
+                          height=460, margin=dict(l=10, r=10, t=10, b=10),
+                          xaxis_title="Job Postings", font=dict(color=T["text"]))
         st.plotly_chart(fig, use_container_width=True)
 
     with c2:
         st.markdown('<div class="section-title">💰 Average Salary by Role</div>', unsafe_allow_html=True)
-        avg_sal = jobs.copy()
-        avg_sal["avg_salary"] = (avg_sal["salary_min_pkr"] + avg_sal["salary_max_pkr"]) / 2
-        top_paying = avg_sal.groupby("title")["avg_salary"].mean().sort_values().tail(10)
+        if role_salaries_precomputed is not None and not role_salaries_precomputed.empty:
+            top_paying = role_salaries_precomputed.set_index("title")["avg_salary_pkr"].sort_values().tail(10)
+        else:
+            top_paying = calculate_role_salaries_df(jobs).set_index("title")["avg_salary_pkr"].sort_values().tail(10)
+
         fig = go.Figure(go.Bar(
             x=top_paying.values, y=top_paying.index, orientation="h",
             marker=dict(color=top_paying.values, colorscale=[[0, T["accent3"]], [1, T["accent"]]]),
         ))
         fig.update_layout(template=T["plot_template"], plot_bgcolor=T["chart_bg"], paper_bgcolor=T["chart_bg"],
-                           height=460, margin=dict(l=10, r=10, t=10, b=10),
-                           xaxis_title="Avg Salary (PKR/month)", font=dict(color=T["text"]))
+                          height=460, margin=dict(l=10, r=10, t=10, b=10),
+                          xaxis_title="Avg Salary (PKR/month)", font=dict(color=T["text"]))
         st.plotly_chart(fig, use_container_width=True)
 
     st.markdown('<div class="section-title">🌆 Job Distribution by City</div>', unsafe_allow_html=True)
@@ -288,41 +329,34 @@ with tab1:
     fig = px.pie(values=city_counts.values, names=city_counts.index, hole=0.55,
                  color_discrete_sequence=[T["accent"], T["accent2"], T["accent3"], "#F5A623", "#4A90D9", "#9013FE", "#50E3C2"])
     fig.update_layout(template=T["plot_template"], paper_bgcolor=T["chart_bg"],
-                       height=380, margin=dict(l=10, r=10, t=10, b=10), font=dict(color=T["text"]))
+                      height=380, margin=dict(l=10, r=10, t=10, b=10), font=dict(color=T["text"]))
     st.plotly_chart(fig, use_container_width=True)
 
 # ================= TAB 2: Trending Skills =================
 with tab2:
     st.markdown('<div class="section-title">📈 Fastest Growing Skills</div>', unsafe_allow_html=True)
-    st.caption("Comparing the last 90 days of postings vs. the rest of the year (normalized by daily rate)")
+    st.caption("Comparing recent temporal window vs. prior historical baseline (daily-rate normalized)")
 
-    skills_dt = skills.copy()
-    skills_dt["date_posted"] = pd.to_datetime(
-        jobs.set_index("job_id").loc[skills_dt["job_id"]]["date_posted"].values
-    )
-    max_date = skills_dt["date_posted"].max()
-    cutoff = max_date - pd.Timedelta(days=90)
-
-    older_days = max(1, (skills_dt["date_posted"].max() - skills_dt["date_posted"].min()).days - 90)
-    recent = skills_dt[skills_dt["date_posted"] >= cutoff]["skill"].value_counts() / 90
-    older = skills_dt[skills_dt["date_posted"] < cutoff]["skill"].value_counts() / older_days
-
-    trend_df = pd.DataFrame({"recent_rate": recent, "older_rate": older}).fillna(0)
-    trend_df = trend_df[trend_df["recent_rate"] * 90 > 15]
-    trend_df["growth_pct"] = ((trend_df["recent_rate"] - trend_df["older_rate"]) /
-                               trend_df["older_rate"].replace(0, 0.001)) * 100
-    trend_df = trend_df.sort_values("growth_pct").tail(10)
+    if trending_precomputed is not None and not trending_precomputed.empty:
+        trend_df = trending_precomputed.sort_values("growth_pct").tail(10)
+    else:
+        trend_df = calculate_trending_skills_df(jobs, skills, recent_window_days=90, min_recent_count=15, top_n=10)
+        trend_df = trend_df.sort_values("growth_pct")
 
     colors = [T["accent3"] if v > 0 else T["accent"] for v in trend_df["growth_pct"]]
-    fig = go.Figure(go.Bar(x=trend_df["growth_pct"], y=trend_df.index, orientation="h",
-                            marker=dict(color=colors)))
+    fig = go.Figure(go.Bar(
+        x=trend_df["growth_pct"],
+        y=trend_df["skill"],
+        orientation="h",
+        marker=dict(color=colors)
+    ))
     fig.update_layout(template=T["plot_template"], plot_bgcolor=T["chart_bg"], paper_bgcolor=T["chart_bg"],
-                       height=460, margin=dict(l=10, r=10, t=10, b=10),
-                       xaxis_title="Growth % (recent vs. earlier this year)", font=dict(color=T["text"]))
+                      height=460, margin=dict(l=10, r=10, t=10, b=10),
+                      xaxis_title="Growth % (Recent vs. Historical Baseline)", font=dict(color=T["text"]))
     st.plotly_chart(fig, use_container_width=True)
 
-    st.info("💡 **Insight:** AI-related skills (ChatGPT/LLM Tools, Prompt Engineering, Generative AI) "
-            "and Cloud Computing show the sharpest growth — these are worth prioritizing.")
+    st.info("💡 **Insight:** AI-related tools (ChatGPT/LLM Tools, Prompt Engineering, Generative AI) "
+            "and Cloud Computing exhibit significant growth — priority targets for continuous learning.")
 
 # ================= TAB 3: Skill Gap + Salary =================
 with tab3:
@@ -339,43 +373,45 @@ with tab3:
         current_skills = st.multiselect("✅ Skills you ALREADY have:", all_skills)
 
     if st.button("🔍 Analyze My Career Path", type="primary"):
-        role_skills = skills[skills["title"] == target_role]["skill"].value_counts().head(10)
-        current_set = set(s.lower() for s in current_skills)
+        # Centralized skill gap evaluation
+        gap_result = analyze_skill_gap(skills, target_role=target_role, current_skills=current_skills, top_n=10)
+        match_pct = gap_result["market_match_pct"]
+        have = gap_result["skills_you_have"]
+        missing = gap_result["skills_to_learn"]
 
-        have = [s for s in role_skills.index if s.lower() in current_set]
-        missing = [s for s in role_skills.index if s.lower() not in current_set]
-        match_pct = len(have) / len(role_skills) * 100 if len(role_skills) > 0 else 0
+        # Centralized salary prediction
+        predicted_salary = predict_salary(
+            model=model,
+            encoders=encoders,
+            features=features,
+            title=target_role,
+            city=target_city,
+            experience=target_exp,
+            industry=target_industry,
+            skill_count=len(current_skills),
+            metadata=metadata
+        )
 
         st.markdown("<br>", unsafe_allow_html=True)
         m1, m2 = st.columns(2)
         with m1: metric_card("Market Match", f"{match_pct:.0f}%", T["accent2"])
-
-        try:
-            row = pd.DataFrame([{
-                "title_enc": encoders["title"].transform([target_role])[0],
-                "city_enc": encoders["city"].transform([target_city])[0],
-                "exp_enc": encoders["experience"].transform([target_exp])[0],
-                "industry_enc": encoders["industry"].transform([target_industry])[0],
-                "skill_count": max(len(current_skills), 1),
-            }])[features]
-            predicted_salary = model.predict(row)[0]
-            with m2: metric_card("Estimated Salary", f"PKR {predicted_salary:,.0f}", T["accent"])
-        except Exception:
-            with m2: metric_card("Estimated Salary", "N/A", T["accent"])
+        with m2: metric_card("Estimated Salary", f"PKR {predicted_salary:,.0f}", T["accent"])
 
         st.markdown("<br>", unsafe_allow_html=True)
+        have_pills = ''.join(f'<span class="pill pill-have">{html.escape(s)}</span>' for s in have)
         st.markdown(f"""
         <div class="pill-box">
             <b>✅ Skills you already have that match this role:</b><br><br>
-            {''.join(f'<span class="pill pill-have">{s}</span>' for s in have) if have else '<i>None yet — start building your foundation!</i>'}
+            {have_pills if have else '<i>None yet — start building your foundation!</i>'}
         </div>
         """, unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
+        missing_pills = ''.join(f'<span class="pill pill-missing">{html.escape(s)}</span>' for s in missing)
         st.markdown(f"""
         <div class="pill-box">
-            <b>📚 Top skills to learn next for {target_role}:</b><br><br>
-            {''.join(f'<span class="pill pill-missing">{s}</span>' for s in missing) if missing else '<i>You already have them all! 🎉</i>'}
+            <b>📚 Top skills to learn next for {html.escape(target_role)}:</b><br><br>
+            {missing_pills if missing else '<i>You already have all top market skills for this role! 🎉</i>'}
         </div>
         """, unsafe_allow_html=True)
 
