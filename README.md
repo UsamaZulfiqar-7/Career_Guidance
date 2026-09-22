@@ -114,29 +114,20 @@ streamlit run 05_dashboard_app.py
 
 ---
 
-## 7. Honest Limitations (Yeh Chupana Nahi, Viva Mein Bolo)
+## 7. Honest Limitations
 
 Real data use karne ka faida yeh hai ke project asli hai, lekin do cheezein sample-size ki wajah se kamzor hain:
 
 1. **Salary Model ka R² kam (ya negative) hai.** 640 postings 12 roles × 6 cities × 29 industries mein bat jate hain, is liye model ke paas seekhne ko kaafi data nahi hota. Yeh ek real limitation hai, bug nahi.
 2. **Trending Skills is dataset par meaningful nahi hai.** Dataset mein posting date nahi, sirf deadline hai, jo sirf ~83 din ke range mein simat jata hai. Isse "recent vs older period" comparison ka koi matlab nahi banta (older period mein data hi nahi bachta).
 
-**Presentation mein yeh kaise bolna hai:** "Maine real Kaggle dataset use kiya, sample-generated data nahi. Real data ka faida yeh hai ke findings genuine hain, lekin sample size chhota hone ki wajah se salary model aur trending analysis ki accuracy limited hai — real deployment mein zyada data (jaise live scraping se roz naye postings) is masle ko solve karega."
+"Maine real Kaggle dataset use kiya, sample-generated data nahi. Real data ka faida yeh hai ke findings genuine hain, lekin sample size chhota hone ki wajah se salary model aur trending analysis ki accuracy limited hai — real deployment mein zyada data (jaise live scraping se roz naye postings) is masle ko solve karega."
 
 ---
 
-## 8. Presentation Mein Kya Bolna Hai (Sir Ko Impress Karne Ke Liye)
 
-1. **Problem se start karo** — "Fresh graduates ko pata nahi hota kya seekhein, is wajah se galat skills seekh kar time waste karte hain. Maine is problem ko real data se solve karne ki koshish ki."
-2. **Data source explain karo** — Kaggle ka real Rozee.pk dataset, 1059 raw postings, cleaning ke baad 640.
-3. **Big Data justification** — "Ek job portal roz hazaron postings receive karta hai. Manually analyze karna impossible hai, isliye Spark ka distributed processing use kiya — chhote dataset par bhi wahi pipeline chalegi jo lakhon postings par chalegi."
-4. **Live demo karo** — dashboard khol kar khud apna role/skills daal kar dikhao (Section 6, Step D).
-5. **Limitations honestly bolo** — Section 7 wale points. Ye tumhe zyada credible banayega, chupane se nuksan hoga.
-6. **Future scope** — "Live scraping pipeline (`02_scraper_template.py` mein starting template hai) roz naye, dated postings add karegi, jis se Trending Skills aur salary model dono behtar honge."
 
----
-
-## 9. Common Errors
+## 8. Common Errors
 
 | Error | Fix |
 |---|---|
