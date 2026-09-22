@@ -223,7 +223,7 @@ if missing_files:
         f"`{', '.join(missing_files)}`.\n\n"
         "Please run the pipeline steps in order before launching the dashboard:\n\n"
         "```bash\n"
-        "python 01_generate_sample_data.py\n"
+        "python 01_prepare_real_data.py\n"
         "python 03_spark_skills_analysis.py\n"
         "python 04_recommendation_engine.py\n"
         "```"
@@ -263,7 +263,7 @@ with st.sidebar:
     st.markdown("### ⚙️ Settings")
     icon = "🌙" if st.session_state.theme == "dark" else "☀️"
     st.button(f"{icon} Switch to {'Light' if st.session_state.theme == 'dark' else 'Dark'} Mode",
-              on_click=toggle_theme, use_container_width=True)
+              on_click=toggle_theme, width='stretch')
     st.divider()
     st.markdown("**About this tool**")
     st.caption("A Big Data Analytics project that analyzes job market data "
@@ -306,7 +306,7 @@ with tab1:
         fig.update_layout(template=T["plot_template"], plot_bgcolor=T["chart_bg"], paper_bgcolor=T["chart_bg"],
                           height=460, margin=dict(l=10, r=10, t=10, b=10),
                           xaxis_title="Job Postings", font=dict(color=T["text"]))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
     with c2:
         st.markdown('<div class="section-title">💰 Average Salary by Role</div>', unsafe_allow_html=True)
@@ -322,7 +322,7 @@ with tab1:
         fig.update_layout(template=T["plot_template"], plot_bgcolor=T["chart_bg"], paper_bgcolor=T["chart_bg"],
                           height=460, margin=dict(l=10, r=10, t=10, b=10),
                           xaxis_title="Avg Salary (PKR/month)", font=dict(color=T["text"]))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
     st.markdown('<div class="section-title">🌆 Job Distribution by City</div>', unsafe_allow_html=True)
     city_counts = jobs["city"].value_counts()
@@ -330,7 +330,7 @@ with tab1:
                  color_discrete_sequence=[T["accent"], T["accent2"], T["accent3"], "#F5A623", "#4A90D9", "#9013FE", "#50E3C2"])
     fig.update_layout(template=T["plot_template"], paper_bgcolor=T["chart_bg"],
                       height=380, margin=dict(l=10, r=10, t=10, b=10), font=dict(color=T["text"]))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
 # ================= TAB 2: Trending Skills =================
 with tab2:
@@ -353,10 +353,20 @@ with tab2:
     fig.update_layout(template=T["plot_template"], plot_bgcolor=T["chart_bg"], paper_bgcolor=T["chart_bg"],
                       height=460, margin=dict(l=10, r=10, t=10, b=10),
                       xaxis_title="Growth % (Recent vs. Historical Baseline)", font=dict(color=T["text"]))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
-    st.info("💡 **Insight:** AI-related tools (ChatGPT/LLM Tools, Prompt Engineering, Generative AI) "
-            "and Cloud Computing exhibit significant growth — priority targets for continuous learning.")
+    if trend_df.empty:
+        st.info("💡 Not enough postings in the recent window to compute a reliable trend on this dataset.")
+    else:
+        top_grower = trend_df.sort_values("growth_pct", ascending=False).iloc[0]
+        st.info(
+            f"💡 **Insight:** \"{top_grower['skill']}\" shows the strongest recent growth "
+            f"({top_grower['growth_pct']:.0f}%) in this dataset."
+        )
+        st.caption(
+            "⚠️ Note: this dataset's date field is an application deadline, not a posting date, "
+            "so trend results should be presented as exploratory, not a confirmed market trend."
+        )
 
 # ================= TAB 3: Skill Gap + Salary =================
 with tab3:

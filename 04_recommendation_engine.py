@@ -43,13 +43,23 @@ if __name__ == "__main__":
     df_jobs = pd.read_csv("job_postings.csv")
     df_skills = pd.read_csv("job_skills_exploded.csv")
 
+    # Real data mein roles/cities fixed nahi hote, isliye examples data se hi uthao
+    example_role = df_jobs["title"].value_counts().index[0]
+    example_city = df_jobs["city"].value_counts().index[0]
+    example_industry = df_jobs["industry"].value_counts().index[0]
+    example_exp = df_jobs["experience_level"].value_counts().index[0]
+    role_skills = (
+        df_skills[df_skills["title"] == example_role]["skill"].value_counts().index.tolist()
+    )
+    example_current = role_skills[:2]
+
     print("=" * 60)
     print("EXAMPLE 1: Skill Gap Analysis")
     print("=" * 60)
     example = analyze_skill_gap(
         df_skills,
-        target_role="Data Analyst",
-        current_skills=["Excel", "SQL", "Communication"]
+        target_role=example_role,
+        current_skills=example_current
     )
     print(f"Target Role: {example['target_role']}")
     print(f"Market Match: {example['market_match_pct']}%")
@@ -65,16 +75,25 @@ if __name__ == "__main__":
     print(f"  Mean Absolute Error: PKR {metadata['mae']:,.0f}")
     print(f"  R² Score: {metadata['r2']:.3f}")
 
-    assert metadata["r2"] > 0.70, f"Model quality below threshold! R2: {metadata['r2']}"
+    # REAL data par R² kam (ya negative) aa sakta hai — synthetic data mein
+    # salary ek formula se banai gayi thi, is liye wahan R² 0.98 tha. Yahan
+    # sirf 640 postings, 12 roles aur 29 industries hain, is liye chota
+    # train/test split noisy hai. Isliye hum crash NAHI karte, sirf batate hain.
+    if metadata["r2"] < 0.30:
+        print(
+            "  [Note] Low/negative R² is expected here: small sample size (640 rows) "
+            "split across many role/city/industry categories. Report this honestly as "
+            "a limitation, not a bug — don't claim a high R² in your presentation."
+        )
 
     predicted = predict_salary(
         model, encoders, features,
-        title="Data Analyst", city="Lahore",
-        experience="Mid Level (2-4 yrs)", industry="IT/Software",
+        title=example_role, city=example_city,
+        experience=example_exp, industry=example_industry,
         skill_count=6,
         metadata=metadata
     )
-    print(f"\nPredicted salary for a Mid-Level Data Analyst in Lahore (IT/Software, 6 skills):")
+    print(f"\nPredicted salary for {example_exp} {example_role} in {example_city} ({example_industry}, 6 skills):")
     print(f"PKR {predicted:,.0f} per month")
 
     # Save model and encoders for the dashboard

@@ -1,16 +1,14 @@
 # TESTING GUIDE — Career Guidance Tool
 Complete guide on how to run, test, and verify each part of the project.
-I personally ran every step of this project before giving it to you — this
-guide shows you the EXACT output you should expect at each step.
+Yeh guide **real Rozee.pk dataset** ke outputs dikhati hai — sample/fake data
+ke numbers nahi, jo tumne apne terminal par khud produce kiye.
 
 ---
 
 ## Before You Start: Requirements Check
 
-Open your terminal and run these 3 checks:
-
 ```bash
-python3 --version
+python --version
 ```
 Expected: `Python 3.9` or higher
 
@@ -23,180 +21,221 @@ If missing: install JDK from https://adoptium.net/ (choose JDK 11 or 17)
 ```bash
 pip --version
 ```
-Expected: pip version info. If missing, install Python properly (pip comes bundled).
+Expected: pip version info.
 
 ---
 
 ## Setup (Do This Once)
 
 ```bash
-# 1. Go into the project folder
 cd career_guidance_project
-
-# 2. Create a virtual environment (keeps packages isolated - good practice)
 python -m venv career_env
-
-# 3. Activate it
-# On Mac/Linux:
-source career_env/bin/activate
-# On Windows:
-career_env\Scripts\activate
-
-# 4. Install everything the project needs
+career_env\Scripts\activate          # Windows
 pip install -r requirements.txt
 ```
-
-This will take 2-5 minutes (PySpark is a big download, ~300MB). Wait for it
-to finish without errors.
 
 **How to know it worked:** Run `pip list` — you should see `pyspark`,
 `pandas`, `scikit-learn`, `streamlit` in the list.
 
 ---
 
-## STEP A: Generate the Data
+## Dataset Placement (Do This Before Step A)
+
+Kaggle se `archive.zip` download karo aur project mein rakho:
+
+```
+career_guidance_project/
+└── data/
+    └── archive.zip        (isme RozeePK-Jobs-2024.csv hai)
+```
+
+Agar zip extract kar li ho, to `RozeePK-Jobs-2024.csv` project root mein bhi
+rakh sakte ho — script dono jagah check karti hai.
+
+---
+
+## STEP A: Clean the Real Dataset
 
 ```bash
-python3 01_generate_sample_data.py
+python 01_prepare_real_data.py
 ```
 
-### ✅ Expected Output (this is exactly what I got when I ran it):
+### ✅ Expected Output (yeh real output hai, tumne khud produce kiya):
 ```
-Sample dataset created: job_postings.csv
-Total postings: 8000
-Unique roles: 20
-Unique cities: 7
-Date range: 2024-09-01 to 2025-09-01
+Loading RozeePK-Jobs-2024.csv
+Raw rows: 1059
+After removing empty/duplicate rows: 1029
+Dropped (no skills / experience / date / unmatched role): 116
+Dropped (salary missing/unrealistic): 241
+Dropped (roles with < 15 postings): 32
 
-Sample rows:
-     job_id                  title  ... salary_max_pkr date_posted
-0  JOB00001     Frontend Developer  ...         112078  2025-04-05
-1  JOB00002        DevOps Engineer  ...          68872  2024-10-18
-...
+Saved: job_postings.csv  (640 postings)
+Roles (12):
+title
+Sales & Business Development    161
+Accounts & Finance               76
+Customer Support                 75
+Marketing                        60
+Admin & Office Support           55
+Operations & Logistics           48
+Software / Web Developer         41
+Design & Creative                33
+Engineering (Non-IT)             30
+Human Resources                  22
+Teaching & Training              22
+IT & Networking                  17
+
+Cities: 6 | Industries: 29
+Date range (deadline proxy): 2024-12-21 -> 2025-03-14
+
+[WARNING] Dataset mein posting date nahi hai (sirf 'Apply Before'). Saari
+dates ~1 mahine mein hain, is liye 'Trending Skills' analysis is data par
+MEANINGFUL nahi hai.
 ```
 
 ### How to verify it worked:
-1. Check that a new file `job_postings.csv` appeared in your folder.
-2. Open it in Excel/Google Sheets — you should see 8,000 rows with columns:
-   `job_id, title, company, city, industry, experience_level, skills, salary_min_pkr, salary_max_pkr, date_posted`
+1. Check `job_postings.csv` appeared in your folder.
+2. Row count should be **640**, columns: `job_id, title, company, city,
+   industry, experience_level, skills, salary_min_pkr, salary_max_pkr,
+   date_posted, original_title, job_type, min_education`.
 
-**If this step fails:** Usually a `ModuleNotFoundError` for pandas/numpy —
-run `pip install -r requirements.txt` again and make sure your virtual
-environment is activated (you should see `(career_env)` at the start of
-your terminal line).
+**If this step fails:**
+| Problem | Fix |
+|---|---|
+| `ERROR: dataset nahi mili` | `archive.zip` ko `data\archive.zip` par rakho |
+| `ModuleNotFoundError: pandas` | `pip install -r requirements.txt` dobara chalao, venv active hai check karo |
 
 ---
 
 ## STEP B: Run the Spark Big Data Analysis
 
 ```bash
-python3 03_spark_skills_analysis.py
+python 03_spark_skills_analysis.py
 ```
 
-This is the most important step to demo — it's the actual "Big Data"
-processing part of your project.
-
-### ✅ Expected Output (real output I got):
+### ✅ Expected Output (real output, tumne khud produce kiya):
 ```
 Spark session started. Version: 4.2.0
-Total job postings loaded: 8000
-Total (job, skill) pairs after exploding: 44945
+Total job postings loaded: 640
+Total (job, skill) pairs after exploding: 2578
 
 --- TOP 15 MOST IN-DEMAND SKILLS (OVERALL) ---
-+---------------+------------+---------------+
-|skill          |demand_count|pct_of_all_jobs|
-+---------------+------------+---------------+
-|SQL            |2404        |30.05          |
-|Python         |1847        |23.09          |
-|Git            |1825        |22.81          |
-|Communication  |1472        |18.40          |
-|Java           |1251        |15.64          |
++--------------------------------+------------+---------------+
+|skill                           |demand_count|pct_of_all_jobs|
++--------------------------------+------------+---------------+
+|Communication                   |234         |36.56          |
+|English Fluency                 |90          |14.06          |
+|Sales Management                |55          |8.59           |
+|Coordination Skills             |48          |7.50           |
+|Admin Operations Management     |40          |6.25           |
+|End to End Sales                |32          |5.00           |
+|Telemarketing Skills            |24          |3.75           |
+|Customer Satisfaction Management|23          |3.59           |
+|JavaScript                      |21          |3.28           |
+|Travels Knowledge               |20          |3.13           |
+|MS Excel                        |20          |3.13           |
 ...
 
---- TRENDING SKILLS (Last 3 Months vs Rest of Year) ---
-+------------------+------------+-----------+----------+
-|skill             |recent_count|older_count|growth_pct|
-+------------------+------------+-----------+----------+
-|ChatGPT/LLM Tools |224         |334        |104.9     |
-|Prompt Engineering|211         |327        |97.2      |
-|Generative AI     |193         |321        |83.7      |
-|Cloud Computing   |355         |660        |64.4      |
-...
+--- AVERAGE SALARY BY ROLE (PKR) ---
++----------------------------+--------------+------------+
+|title                       |avg_salary_pkr|num_postings|
++----------------------------+--------------+------------+
+|Software / Web Developer    |116122.0      |41          |
+|IT & Networking             |102647.0      |17          |
+|Human Resources             |100659.0      |22          |
+|Engineering (Non-IT)        |90083.0       |30          |
+|Accounts & Finance          |86829.0       |76          |
+|Design & Creative           |80985.0       |33          |
+|Marketing                   |79417.0       |60          |
+|Operations & Logistics      |75000.0       |48          |
+|Admin & Office Support      |74991.0       |55          |
+|Sales & Business Development|62811.0       |161         |
+|Customer Support            |58813.0       |75          |
+|Teaching & Training         |56136.0       |22          |
++----------------------------+--------------+------------+
 
-Saved: job_skills_exploded.csv, top_skills_overall.csv
+Saved: job_skills_exploded.csv, top_skills_overall.csv, trending_skills.csv, role_salaries.csv
 Done. Spark session stopped.
 ```
 
-### How to verify it worked:
-1. You should see Spark tables printed in the terminal (boxes with `|` characters like above).
-2. Two new files appear: `job_skills_exploded.csv` and `top_skills_overall.csv`
-3. **Key thing to check:** `job_skills_exploded.csv` should have MORE rows
-   than `job_postings.csv` (44,945 vs 8,000) — this proves the "explode"
-   step worked (one job with 5 skills became 5 rows).
+### ⚠️ Ek cheez expected hai (bug nahi):
+"TRENDING SKILLS" table mein har skill ka `older_count = 0` aayega aur
+`growth_pct` bohot bara (jaise 28092%) dikhega. Yeh dataset ki date-range
+limitation ki wajah se hai (Section 7 of README.md), koi coding error
+nahi. **Is table ko presentation mein highlight mat karna.**
 
-### What each part means (for your viva/presentation):
-- **"Total (job, skill) pairs after exploding: 44945"** → this proves you're
-  doing real data transformation, not just reading a CSV
-- **Trending skills table** → this is your most impressive result. Point out
-  that AI-related skills grew 80-100%+ in recent months — a genuine market insight
+### How to verify it worked:
+1. Spark tables printed honi chahiye (boxes with `|` characters).
+2. 4 new files appear: `job_skills_exploded.csv`, `top_skills_overall.csv`,
+   `trending_skills.csv`, `role_salaries.csv`
+3. `job_skills_exploded.csv` mein **2578 rows** honi chahiye (640 se zyada) —
+   yeh proves "explode" step kaam kar raha hai.
+
+### What this means (for your viva):
+- **"Total (job, skill) pairs after exploding: 2578"** → real data transformation ho rahi hai
+- **Communication (36.56%)** sabse demanded skill hai — is dataset mein zyada tar postings non-tech roles (Sales, Admin, Customer Support) ki hain, is liye soft skills top par hain
 
 **If this step fails:**
 | Problem | Fix |
 |---|---|
 | `JAVA_HOME` error / `Java gateway process exited` | Java not installed or wrong version. Install JDK 11 or 17. |
-| Takes very long / hangs | Normal on first run (Spark initializes). Wait 30-60 seconds. |
-| `FileNotFoundError: job_postings.csv` | You skipped Step A. Run `01_generate_sample_data.py` first. |
+| `Error: job_postings.csv not found!` | Step A ka poora output check karo — "Saved: job_postings.csv" print hona chahiye tha |
 
 ---
 
 ## STEP C: Train the Recommendation Engine
 
 ```bash
-python3 04_recommendation_engine.py
+python 04_recommendation_engine.py
 ```
 
-### ✅ Expected Output (real output I got):
+### ✅ Expected Output (real output, tumne khud produce kiya):
 ```
 ============================================================
 EXAMPLE 1: Skill Gap Analysis
 ============================================================
-Target Role: Data Analyst
-Market Match: 30.0%
-Skills you already have: ['Communication', 'Excel', 'SQL']
-Skills to learn next: ['Python', 'Data Visualization', 'Statistics', 'Power BI', 'Tableau', 'Cloud Computing', 'ChatGPT/LLM Tools']
+Target Role: Sales & Business Development
+Market Match: 20.0%
+Skills you already have: ['Communication', 'Sales Management']
+Skills to learn next: ['English Fluency', 'End to End Sales', 'Coordination Skills', 'Telemarketing Skills', 'Sales Automation', 'Business Development Process', 'B2B Business Development', 'Student Counseling']
 
 ============================================================
-EXAMPLE 2: Salary Prediction Model
+EXAMPLE 2: Salary Prediction Model Training & Inference
 ============================================================
 Salary Model Performance:
-  Mean Absolute Error: PKR 6,841
-  R² Score: 0.983
+  Mean Absolute Error: PKR 40,066
+  R² Score: -0.167
+  [Note] Low/negative R² is expected here: small sample size (640 rows)
+  split across many role/city/industry categories. Report this honestly as
+  a limitation, not a bug — don't claim a high R² in your presentation.
 
-Predicted salary for a Mid-Level Data Analyst in Lahore (IT/Software, 6 skills):
-PKR 113,419 per month
+Predicted salary for Mid Level (2-4 yrs) Sales & Business Development in Lahore (Sales & Business Development, 6 skills):
+PKR 97,981 per month
 
-Saved: salary_model.pkl, salary_encoders.pkl, salary_features.pkl
+Saved: salary_model.pkl, salary_encoders.pkl, salary_features.pkl, salary_metadata.pkl
 ```
 
 ### How to verify it worked:
-1. **R² Score should be above 0.80** (mine was 0.983 — very good). This
-   tells you how well the model explains salary variation. Closer to 1.0 = better.
-2. Three new `.pkl` files appear — these are your trained model saved to disk.
-3. The "Skills to learn next" list should make logical sense (e.g., for
-   Data Analyst it correctly suggests Python, Power BI, Tableau — real
-   data-analyst tools).
+1. Three (actually four) `.pkl` files appear.
+2. R² negative aana **normal hai is dataset par** — yeh kam data ki wajah
+   se hai, koi bug nahi. **0.98 jaisa number expect mat karo**, wo purane
+   synthetic (fake) data se tha.
+3. "Skills to learn next" list logically make sense karni chahiye.
 
 ### What R² and MAE mean (for your viva):
-- **R² Score (0.983)**: the model explains 98.3% of the variation in salary
-  using just role, city, experience, and skill count. Very strong fit.
-- **MAE (PKR 6,841)**: on average, predictions are off by about 6,800 PKR —
-  small compared to salaries in the 100,000+ range.
+- **R² Score (-0.167)**: model role/city/industry/experience/skill-count se
+  salary ko explain karne mein average guess se bhi kharab hai. Wajah: 640
+  rows, 12 roles, 29 industries — itne categories ke liye data kam hai.
+- **MAE (PKR 40,066)**: average prediction error, salary range ke hisaab se
+  bara hai — yeh bhi chhote data ki nishani hai.
+- **Honest framing:** "Model ka architecture sahi hai (Random Forest,
+  proper encoding, fallback logic) — accuracy sample size se limited hai.
+  Zyada real data milne par yehi pipeline behtar model dega."
 
 **If this step fails:**
 | Problem | Fix |
 |---|---|
-| `FileNotFoundError: job_skills_exploded.csv` | You skipped Step B. Run it first. |
-| Very low R² score (below 0.5) | Something wrong in data generation — re-run Step A and B fresh. |
+| `Error: Input CSVs not found` | Step A aur B pehle chalao |
 
 ---
 
@@ -214,41 +253,35 @@ You can now view your Streamlit app in your browser.
   Network URL: http://192.168.x.x:8501
 ```
 
-A browser tab should open automatically. If not, copy the `Local URL` and
-paste it into your browser manually.
-
-### How to test the dashboard (do all of these before your presentation):
+### How to test the dashboard:
 
 **Test 1 — Market Overview tab:**
-- You should see 3 numbers at top: total postings (8,000), unique skills, job roles
-- Two bar charts: top 15 skills, top paying roles
-- ✅ Pass criteria: charts render without errors, numbers look reasonable
+- Top numbers should show **640** total postings
+- Charts: top 15 skills (Communication should be #1), top paying roles
+  (Software / Web Developer should be #1)
 
 **Test 2 — Trending Skills tab:**
-- A horizontal bar chart showing growth percentages
-- ✅ Pass criteria: ChatGPT/LLM Tools, Prompt Engineering, Generative AI, Cloud
-  Computing should appear at the top with positive (red) growth bars
+- Will show the caveat note about deadline-vs-posting-date limitation
+- Growth % numbers will look unrealistically large — this is expected,
+  don't present this tab as a real market insight
 
-**Test 3 — My Skill Gap & Salary tab (most important — this is your live demo):**
-1. Select target role: `Data Analyst`
-2. Select city: `Lahore`
-3. Select industry: `IT/Software`
-4. Select experience: `Mid Level (2-4 yrs)`
-5. In "Skills you already have", select: `SQL`, `Excel`, `Communication`
-6. Click **"Analyze My Career Path"**
+**Test 3 — My Skill Gap & Salary tab (your live demo):**
+1. Select target role: any of the 12 real roles (e.g. `Software / Web Developer`)
+2. Select city, industry, experience — all populated from real data, no
+   fixed dropdown values
+3. Select a couple of skills you already have
+4. Click **"Analyze My Career Path"**
 
-✅ Expected result:
-- Market Match: around 30%
-- Estimated Salary: around PKR 100,000-120,000/month
-- Green box showing skills you have
-- Orange/yellow box showing skills to learn (should include Python, Power BI, Tableau)
+✅ Expected result: match % and salary estimate will vary depending on your
+selections — there's no single fixed "expected" number anymore since the
+dropdowns are built from real, varied data.
 
 **If the dashboard doesn't load or shows errors:**
 | Problem | Fix |
 |---|---|
-| Blank page / "File not found" errors in browser | You skipped Steps A, B, or C. The dashboard needs all the `.csv` and `.pkl` files they produce. Run 01 → 03 → 04 in order first. |
-| "Address already in use" | Another Streamlit app is running. Run `streamlit run 05_dashboard_app.py --server.port 8502` instead. |
-| Charts don't show | Refresh the browser page (Ctrl+R / Cmd+R) |
+| Blank page / "File not found" errors | You skipped Steps A, B, or C. Run them in order first. |
+| "Address already in use" | `streamlit run 05_dashboard_app.py --server.port 8502` |
+| Charts don't show | Refresh the browser page (Ctrl+R) |
 
 To stop the dashboard: go back to your terminal and press `Ctrl+C`.
 
@@ -256,27 +289,27 @@ To stop the dashboard: go back to your terminal and press `Ctrl+C`.
 
 ## Full Run Order (Copy-Paste Checklist)
 
-Run these in exact order, every time you start fresh or change the dataset:
-
 ```bash
-python3 01_generate_sample_data.py       # Step A
-python3 03_spark_skills_analysis.py      # Step B
-python3 04_recommendation_engine.py      # Step C
-streamlit run 05_dashboard_app.py        # Step D (opens dashboard)
+python 01_prepare_real_data.py       # Step A — real data cleaning
+python 03_spark_skills_analysis.py   # Step B
+python 04_recommendation_engine.py   # Step C
+streamlit run 05_dashboard_app.py    # Step D (opens dashboard)
 ```
 
-If you swap in a REAL dataset (real `job_postings.csv` from Kaggle or your
-scraper), skip Step A and just make sure your real file is named
-`job_postings.csv` with the same column names, then run B → C → D.
+Run every time you start fresh, or if you get a newer/updated `archive.zip`.
 
 ---
 
 ## How to "Prove" Your Project Works (for submission/viva)
 
 Take screenshots of:
-1. Terminal output of Step B (the Spark tables) — proves you used PySpark
-2. The Trending Skills chart from the dashboard — your best insight
+1. Terminal output of Step A — proves real Kaggle data was cleaned (1059 → 640)
+2. Terminal output of Step B (the Spark tables) — proves you used PySpark
 3. A completed "Skill Gap" result from Tab 3 with your own test inputs
-4. The R² score from Step C terminal output — proves your model is accurate
+4. The R² score from Step C terminal output — and be ready to explain it
+   honestly as a small-sample limitation, not hide it
 
-Put these 4 screenshots in your report/presentation slides as evidence.
+Put these 4 screenshots in your report/presentation slides as evidence,
+along with one slide on limitations (see README.md Section 7).
+
+---
