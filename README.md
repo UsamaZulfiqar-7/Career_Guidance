@@ -1,6 +1,6 @@
 # Career Guidance Tool — Big Data Analytics Project
 
-Complete A-Z guide: problem se lekar final presentation tak.
+Complete A-Z guide:
 
 ---
 
