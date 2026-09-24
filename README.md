@@ -2,8 +2,6 @@
 
 Complete A-Z guide:
 
----
-
 ## 1. Problem Statement (Yeh Sabse Pehle Samjho — Sir Yehi Puchein Ge)
 
 **Real Problem:** Pakistan mein har saal lakhon fresh graduates nikalte hain, lekin unhe pata nahi hota ke job market mein **asal mein kya demand hai**. Nateeja: log wo skills seekhte hain jo already saturated hain, ya jo market mein demand hi nahi rakhtin. Career counseling proper tareeqe se available nahi, aur jo hai wo data-driven nahi, sirf generic advice deti hai.
