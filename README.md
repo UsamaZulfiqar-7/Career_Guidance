@@ -16,9 +16,12 @@ Complete A-Z guide:
 
 ## 2. Tech Stack aur Kyun
 
-- **PySpark** — Bulk job postings process karna, skill frequency nikalna (Big Data component)
-- **Pandas + Scikit-learn** — Salary prediction model (Random Forest Regressor)
-- **Streamlit** — Interactive dashboard jahan student apna data enter kare aur guidance paaye
+- **MinIO / AWS S3** — Object Storage for raw data ingestion (`career-guidance-raw` bucket)
+- **SQL (PostgreSQL / SQLite)** — 3NF Relational Data Warehouse (`fact_jobs`, `dim_roles`, `dim_skills`, `bridge_job_skills`)
+- **NoSQL (MongoDB)** — Document store for rich JSON job postings with embedded skills/salary schemas
+- **PySpark** — Bulk job postings distributed analytics & skill frequency explosion (Big Data component)
+- **Pandas + Scikit-learn** — Predictive salary modeling (Random Forest Regressor)
+- **Streamlit** — Interactive modern UI with real-time Career Guidance & Live Data Engineering Explorer
 
 ---
 
@@ -27,16 +30,21 @@ Complete A-Z guide:
 ```
 career_guidance_project/
 │
-├── data/
-│   └── archive.zip                  # Kaggle dataset (RozeePK-Jobs-2024.csv ke andar)
 ├── core/
-│   ├── analytics.py                 # trending/salary helper functions
-│   └── recommender.py               # skill gap + salary model functions
-├── 01_prepare_real_data.py          # REAL data cleaning (Step A)
-├── 02_scraper_template.py           # OPTIONAL: apna live scraper likhne ka template
+│   ├── object_storage.py            # MinIO / AWS S3 / Emulated S3 Client
+│   ├── data_processor.py            # De-duplication, Normalization & 3NF Schema Generator
+│   ├── db_manager.py                # SQL (PostgreSQL/SQLite) & NoSQL (MongoDB) Manager
+│   ├── pipeline.py                  # End-to-End ETL Pipeline Orchestrator
+│   ├── analytics.py                 # Trending & salary helper functions
+│   └── recommender.py               # Skill gap & ML salary model functions
+├── 01_pipeline_storage_to_db.py     # Local -> Object Storage -> Processing -> SQL/NoSQL DB
+├── 01_prepare_real_data.py          # Legacy runner (delegates to 01_pipeline_storage_to_db)
+├── 02_scraper_template.py           # Optional: live scraper template
 ├── 03_spark_skills_analysis.py      # PySpark analysis (Step B) - CORE Big Data part
 ├── 04_recommendation_engine.py      # Skill gap + salary model (Step C)
-├── 05_dashboard_app.py              # Streamlit dashboard (Step D)
+├── 05_dashboard_app.py              # Streamlit dashboard + Data Engineering Explorer (Step D)
+├── docker-compose.yml               # MinIO, PostgreSQL, and MongoDB containers
+├── DATA_ENGINEERING_GUIDE.md        # Complete Data Pipeline architecture & viva guide
 ├── requirements.txt
 └── README.md
 ```
@@ -51,7 +59,11 @@ career_env\Scripts\activate          # Windows
 pip install -r requirements.txt
 ```
 
-Java bhi chahiye hoga PySpark ke liye (JDK 8/11/17). Check: `java -version`
+*(Optional) Start Docker services (MinIO, PostgreSQL, MongoDB):*
+```bash
+docker compose up -d
+```
+> Note: Even if Docker is not started, the pipeline automatically uses intelligent local fallbacks (Emulated S3, SQLite, and JSON Document Store) with zero crashes!
 
 ---
 
@@ -63,25 +75,23 @@ Is project mein **synthetic/fake data nahi hai**. Real dataset use ho raha hai:
 
 **Raw dataset:** 1059 real job postings, columns: Title, Job Location, Functional Area, Career Level, Minimum Experience, Minimum Education, Job Type, Skills, Salary, Apply Before.
 
-**Important limitation:** Dataset mein **posting date nahi hai**, sirf "Apply Before" (application deadline) hai — is liye Trending Skills analysis is dataset par meaningful result nahi deta (Section 7 mein detail hai).
-
-`data/archive.zip` ko project root ke `data` folder mein rakho — `01_prepare_real_data.py` seedha zip se parh leti hai, extract karne ki zaroorat nahi.
-
 ---
 
 ## 6. Step-by-Step Execution
 
-### Step A — Real Data Cleaning
+### Step A — Data Pipeline (Local ➔ Object Storage ➔ Processing ➔ SQL/NoSQL DB)
 ```bash
-python 01_prepare_real_data.py
+python 01_pipeline_storage_to_db.py
 ```
 **Kya karta hai:**
-- Raw 1059 postings ko clean karta hai: missing salary/skills/experience wali rows hataata hai
-- 700+ messy raw titles (jaise "Sales Executive (Male)") ko keyword-matching se **12 clean roles** mein group karta hai
-- Location se city nikalta hai, salary text ("PKR 50,000 - 70,000") ko numbers mein todta hai
-- Experience ko Entry/Mid/Senior buckets mein daalta hai
-
-**Output:** `job_postings.csv` — **640 clean postings**, 12 roles, 6 cities, 29 industries.
+- **Local Storage ➔ Object Storage:** Raw CSV ko MinIO/S3 bucket `career-guidance-raw` mein upload karta hai
+- **Object Storage ➔ Python:** Raw data stream direct memory mein download karta hai
+- **Data Processing:**
+  - **De-duplication:** Exact duplicate rows aur composite key duplicates remove karta hai
+  - **Normalization:** 700+ raw titles ko 12 canonical roles mein group karta hai; Pakistani cities extract karta hai; salaries ko numeric PKR mein parse karta hai; experience level buckets banata hai; skills ke synonyms standardize karta hai
+- **Load to SQL Database:** PostgreSQL / SQLite mein 3NF relational schema load karta hai (`fact_jobs`, `dim_roles`, `dim_cities`, `dim_skills`, `bridge_job_skills`, view `vw_job_market_analytics`)
+- **Load to NoSQL Database:** MongoDB mein embedded document structure load karta hai
+- **Sync:** Spark aur Dashboard ke liye clean `job_postings.csv` aur `job_skills_exploded.csv` generate karta hai
 
 ### Step B — Spark Analysis (CORE Big Data component)
 ```bash

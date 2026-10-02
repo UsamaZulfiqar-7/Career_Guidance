@@ -283,7 +283,15 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-tab1, tab2, tab3 = st.tabs(["📊  Market Overview", "🚀  Trending Skills", "🧭  My Skill Gap & Salary"])
+from core.db_manager import DatabaseManager
+from core.object_storage import ObjectStorageManager
+
+tab1, tab2, tab3, tab4 = st.tabs([
+    "📊  Market Overview",
+    "🚀  Trending Skills",
+    "🧭  My Skill Gap & Salary",
+    "🗄️  Data Engineering & Storage Pipeline"
+])
 
 # ================= TAB 1: Market Overview =================
 with tab1:
@@ -424,6 +432,91 @@ with tab3:
             {missing_pills if missing else '<i>You already have all top market skills for this role! 🎉</i>'}
         </div>
         """, unsafe_allow_html=True)
+
+
+# ================= TAB 4: Data Engineering Pipeline =================
+with tab4:
+    st.markdown('<div class="section-title">🏗️ End-to-End Data Pipeline Architecture</div>', unsafe_allow_html=True)
+    st.info(
+        "**Pipeline Workflow:** Local Storage (CSV/ZIP) ➔ Object Storage (MinIO / S3) ➔ "
+        "Python Stream Processing (De-duplication & 3NF Normalization) ➔ "
+        "SQL (PostgreSQL / SQLite) & NoSQL (MongoDB / Document Store)"
+    )
+
+    # Health & Status Cards
+    db_mgr = DatabaseManager()
+    db_stat = db_mgr.get_status()
+    obj_mgr = ObjectStorageManager()
+    obj_stat = obj_mgr.get_status()
+
+    p1, p2, p3 = st.columns(3)
+    with p1:
+        metric_card("Object Storage", obj_stat["backend"].split("(")[0].strip(), T["accent"])
+        st.caption(f"Bucket: `career-guidance-raw` | Key: `raw/jobs/RozeePK-Jobs-2024.csv`")
+    with p2:
+        metric_card("SQL Relational DB", db_stat["sql_dialect"].upper(), T["accent2"])
+        st.caption(f"Target: `{db_stat['sql_description']}`")
+    with p3:
+        metric_card("NoSQL Document DB", "MongoDB" if db_stat["is_mongo_live"] else "Doc Store", T["accent3"])
+        st.caption(f"Target: `{db_stat['nosql_description']}`")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown('<div class="section-title">🔍 Live SQL Relational Explorer (3NF Schema)</div>', unsafe_allow_html=True)
+    st.caption("Schema: `dim_roles`, `dim_cities`, `dim_companies`, `dim_skills`, `fact_jobs`, `bridge_job_skills`, `vw_job_market_analytics`")
+
+    sample_queries = {
+        "Top 5 In-Demand Roles & Avg Salary (SQL Join)": (
+            "SELECT r.role_name AS role, COUNT(j.job_id) AS total_postings, "
+            "ROUND(AVG(j.salary_avg_pkr), 0) AS avg_salary_pkr "
+            "FROM fact_jobs j JOIN dim_roles r ON j.role_id = r.role_id "
+            "GROUP BY r.role_name ORDER BY total_postings DESC LIMIT 5;"
+        ),
+        "Top 10 In-Demand Skills for Developers (Bridge Table Join)": (
+            "SELECT s.skill_name AS skill, COUNT(*) AS posting_count "
+            "FROM bridge_job_skills js "
+            "JOIN fact_jobs j ON js.job_id = j.job_id "
+            "JOIN dim_roles r ON j.role_id = r.role_id "
+            "JOIN dim_skills s ON js.skill_id = s.skill_id "
+            "WHERE r.role_name = 'Software / Web Developer' "
+            "GROUP BY s.skill_name ORDER BY posting_count DESC LIMIT 10;"
+        ),
+        "Market Postings Breakdown by City": (
+            "SELECT c.city_name AS city, COUNT(j.job_id) AS total_jobs "
+            "FROM fact_jobs j JOIN dim_cities c ON j.city_id = c.city_id "
+            "GROUP BY c.city_name ORDER BY total_jobs DESC;"
+        )
+    }
+
+    selected_query_title = st.selectbox("Select Pre-loaded SQL Query:", list(sample_queries.keys()))
+    user_query = st.text_area("SQL Statement (editable):", value=sample_queries[selected_query_title], height=100)
+
+    if st.button("▶️ Execute SQL Query", key="run_sql"):
+        try:
+            sql_result_df = db_mgr.execute_sql_query(user_query)
+            st.success(f"Query returned {len(sql_result_df)} row(s).")
+            st.dataframe(sql_result_df, use_container_width=True)
+        except Exception as err:
+            st.error(f"SQL Execution Error: {err}")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown('<div class="section-title">🍃 Live NoSQL Document Explorer (MongoDB)</div>', unsafe_allow_html=True)
+    st.caption("Documents contain denormalized nested objects: `skills` (array), `salary` (subdoc), `location` (subdoc).")
+
+    nosql_filter_role = st.selectbox(
+        "Filter NoSQL Documents by Role:",
+        ["All"] + sorted(jobs["title"].unique().tolist()),
+        key="nosql_role_filter"
+    )
+    filter_dict = {} if nosql_filter_role == "All" else {"role": nosql_filter_role}
+    nosql_docs = db_mgr.query_nosql(filter_dict=filter_dict, limit=3)
+
+    if nosql_docs:
+        for idx, doc in enumerate(nosql_docs):
+            with st.expander(f"📄 Document {idx + 1}: {doc.get('job_id')} — {doc.get('original_title')} ({doc.get('role')})"):
+                st.json(doc)
+    else:
+        st.write("No matching documents found.")
+
 
 st.markdown('<div class="footer-note">Big Data Analytics Course Project · Data processed with PySpark · '
             'Salary model: Random Forest Regressor</div>', unsafe_allow_html=True)

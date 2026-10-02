@@ -15,6 +15,10 @@ from .analytics import (
     calculate_role_salaries_df,
 )
 
+from .object_storage import ObjectStorageManager
+from .data_processor import DataProcessor
+from .db_manager import DatabaseManager
+
 __all__ = [
     "get_top_skills_for_role",
     "analyze_skill_gap",
@@ -23,4 +27,8 @@ __all__ = [
     "calculate_dynamic_window",
     "calculate_trending_skills_df",
     "calculate_role_salaries_df",
+    "ObjectStorageManager",
+    "DataProcessor",
+    "DatabaseManager",
 ]
+

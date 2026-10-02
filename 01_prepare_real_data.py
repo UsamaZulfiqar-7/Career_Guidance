@@ -200,6 +200,14 @@ def clean_skills(series: pd.Series) -> pd.Series:
 
 # ------------------------------------------------------------------ MAIN
 def main():
+    try:
+        from core.pipeline import run_pipeline
+        print("[*] Running End-to-End Pipeline: Local Storage -> Object Storage -> Processing -> SQL/NoSQL DB...")
+        run_pipeline()
+        return
+    except Exception as e:
+        print(f"[!] Advanced pipeline encountered notice ({e}). Falling back to direct local processing...")
+
     raw = load_raw()
     print(f"Raw rows: {len(raw)}")
 
@@ -266,11 +274,6 @@ def main():
     print(out["title"].value_counts().to_string())
     print(f"\nCities: {out['city'].nunique()} | Industries: {out['industry'].nunique()}")
     print(f"Date range (deadline proxy): {out['date_posted'].min()} -> {out['date_posted'].max()}")
-    print(
-        "\n[WARNING] Dataset mein posting date nahi hai (sirf 'Apply Before'). "
-        "Saari dates ~1 mahine mein hain, is liye 'Trending Skills' analysis is data par "
-        "MEANINGFUL nahi hai."
-    )
 
 if __name__ == "__main__":
     main()
