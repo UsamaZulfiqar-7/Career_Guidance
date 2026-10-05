@@ -206,54 +206,65 @@ def metric_card(label, value, color):
 # ======================================================================
 # DATA READINESS CHECK
 # ======================================================================
-required_files = ["job_postings.csv", "job_skills_exploded.csv", "salary_model.pkl"]
-missing_files = [f for f in required_files if not os.path.exists(f)]
-
-if missing_files:
+# The dashboard no longer depends on processed CSV files.
+# The authoritative analytical data source is the SQL database populated by
+# 01_pipeline_storage_to_db.py. The salary model remains a local artifact.
+if not os.path.exists("salary_model.pkl"):
     st.markdown("""
     <div class="hero">
         <h1>🎯 Career Guidance Tool</h1>
         <p>Big Data Analytics Project — data-driven answers to "what skills should I actually learn?"</p>
     </div>
     """, unsafe_allow_html=True)
-
-    st.warning("⚠️ **Pipeline Data Not Yet Initialized**")
-    st.info(
-        "The following required pipeline artifact(s) were not found: "
-        f"`{', '.join(missing_files)}`.\n\n"
-        "Please run the pipeline steps in order before launching the dashboard:\n\n"
-        "```bash\n"
-        "python 01_prepare_real_data.py\n"
-        "python 03_spark_skills_analysis.py\n"
-        "python 04_recommendation_engine.py\n"
-        "```"
-    )
+    st.warning("⚠️ **Machine Learning model not initialized**")
+    st.info("Run `python 04_recommendation_engine.py` first to create `salary_model.pkl`.")
     st.stop()
 
 
 # ======================================================================
 # LOAD DATA & MODEL
 # ======================================================================
+from core.db_manager import DatabaseManager
+
+
 @st.cache_data
-def load_data():
-    jobs = pd.read_csv("job_postings.csv")
-    skills = pd.read_csv("job_skills_exploded.csv")
+def load_data_from_database():
+    """Load dashboard data from SQL, not from local CSV files."""
+    db_mgr = DatabaseManager()
+    jobs, skills = db_mgr.get_dashboard_data()
 
-    trending = None
-    if os.path.exists("trending_skills.csv"):
-        trending = pd.read_csv("trending_skills.csv")
+    if jobs.empty:
+        raise RuntimeError(
+            "The SQL database contains no processed jobs. "
+            "Run `python 01_pipeline_storage_to_db.py` first."
+        )
 
-    role_salaries = None
-    if os.path.exists("role_salaries.csv"):
-        role_salaries = pd.read_csv("role_salaries.csv")
-
+    # Trending/salary summaries are calculated from database-backed data.
+    trending = calculate_trending_skills_df(
+        jobs, skills, recent_window_days=90, min_recent_count=15, top_n=10
+    )
+    role_salaries = calculate_role_salaries_df(jobs)
     return jobs, skills, trending, role_salaries
+
 
 @st.cache_resource
 def load_model():
     return load_model_bundle(".")
 
-jobs, skills, trending_precomputed, role_salaries_precomputed = load_data()
+
+try:
+    jobs, skills, trending_precomputed, role_salaries_precomputed = load_data_from_database()
+except Exception as exc:
+    st.markdown("""
+    <div class="hero">
+        <h1>🎯 Career Guidance Tool</h1>
+        <p>Big Data Analytics Project — data-driven answers to "what skills should I actually learn?"</p>
+    </div>
+    """, unsafe_allow_html=True)
+    st.error(f"Database data is not ready: {exc}")
+    st.info("Start PostgreSQL/SQLite as configured, MongoDB if needed, then run `python 01_pipeline_storage_to_db.py`.")
+    st.stop()
+
 model, encoders, features, metadata = load_model()
 
 # ======================================================================
@@ -283,7 +294,6 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-from core.db_manager import DatabaseManager
 from core.object_storage import ObjectStorageManager
 
 tab1, tab2, tab3, tab4 = st.tabs([

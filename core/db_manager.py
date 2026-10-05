@@ -378,6 +378,64 @@ class DatabaseManager:
                 return filtered
         return []
 
+    def get_dashboard_data(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Reconstruct the dashboard datasets directly from the SQL database.
+
+        The Streamlit dashboard uses this method instead of reading
+        job_postings.csv or job_skills_exploded.csv. Those CSV files remain
+        optional downstream artifacts for Spark/export purposes.
+        """
+        jobs_query = """
+        SELECT
+            j.job_id,
+            r.role_name AS title,
+            co.company_name AS company,
+            c.city_name AS city,
+            j.industry,
+            j.experience_level,
+            j.salary_min_pkr,
+            j.salary_max_pkr,
+            j.salary_avg_pkr,
+            j.date_posted,
+            j.job_type,
+            j.min_education
+        FROM fact_jobs j
+        LEFT JOIN dim_roles r ON j.role_id = r.role_id
+        LEFT JOIN dim_cities c ON j.city_id = c.city_id
+        LEFT JOIN dim_companies co ON j.company_id = co.company_id
+        ORDER BY j.job_id;
+        """
+
+        skills_query = """
+        SELECT
+            js.job_id,
+            s.skill_name AS skill,
+            r.role_name AS title,
+            c.city_name AS city,
+            j.salary_avg_pkr,
+            j.date_posted
+        FROM bridge_job_skills js
+        JOIN fact_jobs j ON js.job_id = j.job_id
+        JOIN dim_skills s ON js.skill_id = s.skill_id
+        LEFT JOIN dim_roles r ON j.role_id = r.role_id
+        LEFT JOIN dim_cities c ON j.city_id = c.city_id
+        ORDER BY js.job_id, s.skill_name;
+        """
+
+        jobs = self.execute_sql_query(jobs_query)
+        skills = self.execute_sql_query(skills_query)
+
+        # Match the historical CSV schema used by the recommendation/analytics
+        # modules without making the dashboard depend on those CSV files.
+        jobs["title"] = jobs["title"].fillna("Other")
+        jobs["city"] = jobs["city"].fillna("Other")
+        jobs["industry"] = jobs["industry"].fillna("Other")
+        jobs["experience_level"] = jobs["experience_level"].fillna("Entry Level (0-1 yrs)")
+
+        skills["skill"] = skills["skill"].fillna("Other")
+        return jobs, skills
+
     def get_status(self) -> Dict[str, Any]:
         return {
             "sql_dialect": self.sql_dialect,
